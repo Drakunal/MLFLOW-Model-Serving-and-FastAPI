@@ -127,10 +127,6 @@ uvicorn main:app --reload
 
 ---
 
-Here's a more detailed explanation of the code sections in your project:
-
----
-
 ## Code Explanation
 
 The API is structured in the FastAPI framework with routes for single and batch customer churn predictions, using an MLflow-served model as the prediction backend.
