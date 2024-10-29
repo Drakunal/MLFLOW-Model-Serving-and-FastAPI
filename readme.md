@@ -253,5 +253,6 @@ async def batch_prediction(file: bytes = File(...)):
 
 ## Postman
 ![image](https://github.com/user-attachments/assets/d05e9288-403f-4ba0-a0a0-cb9570de1893)
-![image](https://github.com/user-attachments/assets/23dffbc1-fe18-401c-b57f-22765f218539)
+![image](https://github.com/user-attachments/assets/9ba87ea2-52ed-4003-bf95-1024c5928fc9)
+
 
