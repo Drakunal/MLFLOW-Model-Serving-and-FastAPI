@@ -7,7 +7,7 @@ This project is a FastAPI-based API that allows single and batch customer churn 
 1. [Project Setup](#project-setup)
 2. [Virtual Environment](#virtual-environment)
 3. [Installing Dependencies](#installing-dependencies)
-4. [Serving the Model](#serving-the-model)
+4. [Serving the Model](#Serving-the-Model-with-MLflow)
 5. [Running the API](#running-the-api)
 6. [API Endpoints](#api-endpoints)
 7. [Code Explanation](#code-explanation)
@@ -127,9 +127,13 @@ uvicorn main:app --reload
 
 ---
 
+Here's a more detailed explanation of the code sections in your project:
+
+---
+
 ## Code Explanation
 
-The API uses FastAPI to handle requests, with a Pydantic model to validate incoming data. It includes two primary routes: one for single predictions and one for batch predictions.
+The API is structured in the FastAPI framework with routes for single and batch customer churn predictions, using an MLflow-served model as the prediction backend.
 
 ### 1. Key Imports and Setup
 
@@ -143,12 +147,12 @@ from io import StringIO
 import requests
 ```
 
-- **`FastAPI`**: The main class for creating the API, providing tools for routing and data validation.
-- **`File`, `UploadFile`, `Form`**: Enable file uploads (CSV) and form data handling.
-- **`BaseModel`**: A Pydantic class used to define the expected input data format and validate it.
-- **`pickle`, `numpy`, `pandas`**: These libraries support data handling and model management.
-- **`StringIO`**: Converts byte-encoded strings to a file-like object, essential for reading CSV content.
-- **`requests`**: Used to send HTTP requests to the MLflow model server for predictions.
+- **`FastAPI`**: The primary class for building APIs in FastAPI. It enables routing, validation, and serialization of data.
+- **`File`, `UploadFile`, `Form`**: FastAPI classes for handling file uploads (`File`, `UploadFile`) and form data (`Form`). These simplify data ingestion from external sources like Postman.
+- **`BaseModel`**: Part of Pydantic, used to define the structure and data types for input validation in FastAPI.
+- **`pickle`, `numpy`, `pandas`**: Libraries for data manipulation and loading models (if local). Here, `pandas` is used for processing CSV files, while `numpy` assists with numerical data handling.
+- **`StringIO`**: Converts byte-encoded strings into file-like objects. Essential for reading file content (CSV) uploaded via API.
+- **`requests`**: Python’s HTTP library for sending requests to the MLflow server hosting the model.
 
 ### 2. Initializing the FastAPI App and Data Model
 
@@ -156,7 +160,7 @@ import requests
 app = FastAPI()
 ```
 
-Creates a FastAPI application instance that organizes routes and configurations.
+- This line creates a FastAPI application instance, `app`, which organizes all routes and configurations for the API.
 
 #### Defining the Customer Data Model
 
@@ -176,12 +180,13 @@ class ChurnClass(BaseModel):
     Gender_Male: float
 ```
 
-- **Purpose**: Defines the expected fields for customer data, ensuring consistency in data format for model predictions.
-- **Attributes**: Each attribute maps to a feature required by the model.
+- **`ChurnClass`**: This class inherits from `BaseModel` and defines the expected data fields for a single customer’s information, including data types (all `float` in this case). When a request is made to the `/predict` endpoint, FastAPI will automatically validate and parse the incoming JSON data to match this structure.
+  
+- **Attributes**: Each attribute represents a feature required by the ML model to make a prediction, such as `CreditScore`, `Age`, `Geography_France`, etc.
 
 ### 3. Route Definitions
 
-FastAPI routes determine the URL pattern, HTTP method, and data handling. Decorators like `@app.get` and `@app.post` specify HTTP methods and paths.
+FastAPI allows you to define endpoints (routes) for the API. Routes determine the URL pattern, HTTP method, and data flow for different functionalities. Decorators (e.g., `@app.get`) register each function to a route.
 
 #### Route 1: GET `/`
 
@@ -191,10 +196,10 @@ async def root():
     return {"message": "Hello World"}
 ```
 
-- **Purpose**: Checks API availability.
-- **HTTP Method**: `GET`.
-- **Decorator**: Registers the route with FastAPI.
-- **`async` Function**: Ensures non-blocking execution for better performance.
+- **Purpose**: A simple route to confirm the API server is running.
+- **HTTP Method**: `GET` is used here, as this endpoint is only fetching data (in this case, a JSON message).
+- **Decorator**: `@app.get("/")` tells FastAPI that this function should handle `GET` requests at the root URL (`/`).
+- **`async` Function**: Using `async` here allows this route to be non-blocking, enhancing performance by allowing other tasks to execute concurrently.
 
 #### Route 2: POST `/predict`
 
@@ -216,12 +221,17 @@ async def predict_churn(churn: ChurnClass):
     return response.text
 ```
 
-- **Purpose**: Predicts churn for a single customer.
-- **HTTP Method**: `POST`.
-- **Input (`churn: ChurnClass`)**: Validates that the incoming JSON data matches the `ChurnClass` schema.
-- **Data Processing**: Converts the data into a format compatible with the MLflow model (`data_in`).
-- **Inference Request**: Sends `data_in` to the MLflow model for prediction.
-- **Return**: Model server response.
+- **Purpose**: This route accepts JSON data for a single customer and returns a churn prediction.
+- **HTTP Method**: `POST` is used because we’re sending data to the server to create a new result (the prediction).
+- **Input (`churn: ChurnClass`)**: The function accepts a single parameter, `churn`, which should be a JSON object that matches the `ChurnClass` schema. FastAPI validates this input before running the function.
+- **Data Transformation**:
+  - `data = churn.dict()`: Converts the Pydantic model instance (`churn`) into a Python dictionary.
+  - `data_in`: Transforms the dictionary into a nested list, the format required by the MLflow model.
+- **Inference Request**:
+  - `endpoint`: URL of the MLflow model server.
+  - `inference_request`: A dictionary with the key `dataframe_records`, where `data_in` is sent as the value.
+  - `requests.post`: Sends this data to the model server, which performs the prediction.
+- **Return**: `response.text` returns the response from the model server as plain text, typically the prediction value.
 
 #### Route 3: POST `/files/`
 
@@ -240,14 +250,18 @@ async def batch_prediction(file: bytes = File(...)):
     return response.text
 ```
 
-- **Purpose**: Processes batch predictions from a CSV file.
-- **HTTP Method**: `POST`.
-- **Input**: CSV file uploaded as form-data.
-- **Data Processing**:
-  - Converts file bytes to a string and loads it as a DataFrame.
-  - Converts DataFrame to list format for the model.
-- **Inference Request**: Sends the formatted data to the model server.
-- **Return**: Model server response with predictions.
+- **Purpose**: Handles batch predictions by accepting a CSV file of customer data.
+- **HTTP Method**: `POST`, as we are uploading a file to generate results.
+- **Input**: The function accepts a single parameter, `file`, which represents the uploaded file. `File(...)` tells FastAPI that this parameter should come from a file upload.
+- **Data Transformation**:
+  - `s = str(file, 'utf-8')`: Converts the byte-encoded file content into a UTF-8 string.
+  - `data = StringIO(s)`: Creates a file-like object from the string, which `pandas` can read.
+  - `df = pd.read_csv(data)`: Reads the file as a DataFrame, organizing the data into rows and columns.
+  - `lst = df.values.tolist()`: Converts the DataFrame into a list of lists (`lst`), which the model expects.
+- **Inference Request**:
+  - `inference_request`: Dictionary with the key `dataframe_records` and `lst` as the value.
+  - `requests.post`: Sends the batch data to the model server at `endpoint`.
+- **Return**: The text response from the model server, which includes predictions for each entry in the uploaded CSV.
 
 ---
 
