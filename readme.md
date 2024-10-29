@@ -11,6 +11,7 @@ This project is a FastAPI-based API that allows single and batch customer churn 
 5. [Running the API](#running-the-api)
 6. [API Endpoints](#api-endpoints)
 7. [Code Explanation](#code-explanation)
+8. [Postman Implementation](#postman)
 
 ---
 
@@ -249,3 +250,8 @@ async def batch_prediction(file: bytes = File(...)):
 - **Return**: Model server response with predictions.
 
 ---
+
+## Postman
+![image](https://github.com/user-attachments/assets/d05e9288-403f-4ba0-a0a0-cb9570de1893)
+![image](https://github.com/user-attachments/assets/23dffbc1-fe18-401c-b57f-22765f218539)
+
