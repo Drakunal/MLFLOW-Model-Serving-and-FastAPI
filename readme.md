@@ -1,6 +1,3 @@
-Here's the complete README file with your formatted setup instructions, code explanations, and details on each component.
-
----
 
 # Customer Churn Prediction API
 
